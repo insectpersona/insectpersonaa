@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Insect Persona</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{width:100%;height:100%;background:#c8dba0;overflow:hidden}
+    #stage{position:relative;width:100vw;height:100vh}
+    #stage-img{
+      display:block;width:100%;height:100%;
+      object-fit:contain;object-position:center;
+      image-rendering:pixelated;
+      user-select:none;-webkit-user-drag:none;
+    }
+    #hl{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+    .hs{
+      position:absolute;background:transparent;border:none;
+      cursor:pointer;pointer-events:all;
+      /* Uncomment to debug: background:rgba(255,0,0,.25); */
+    }
+    .hs:hover{background:rgba(255,255,255,.1)}
+    .hs:active{background:rgba(255,255,255,.2)}
+  </style>
+</head>
+<body>
+<div id="stage">
+  <img id="img" src="start.jpeg" alt="" draggable="false"/>
+  <div id="hl"></div>
+</div>
+<script>
+/* ── HOTSPOT COORDS (% of 2000×1413 source image) ── */
+
+// start.jpeg — "Start test" button
+// Pixel coords: x 305–985, y 597–672
+const BTN_START = {t:42.3, l:15.2, w:34.0, h:5.3};
+
+// q*.jpeg — 4 answer buttons A B C D
+// Same position on every question screen
+const BTN_ANS = [
+  {t:47.4, l:15.2, w:69.5, h:7.8},  // A
+  {t:55.3, l:15.2, w:69.5, h:7.5},  // B
+  {t:63.1, l:15.2, w:69.5, h:7.5},  // C
+  {t:70.9, l:15.2, w:69.5, h:7.5},  // D
+];
+
+// result_*.png — "Start again" button
+const BTN_AGAIN = {t:77.4, l:20.5, w:45.5, h:4.7};
+
+/* ── FILES ── */
+const Q_IMGS = [
+  'q1.jpeg','q2.jpeg','q3.jpeg','q4.jpeg','q5.jpeg',
+  'q6.jpeg','q7.jpeg','q8.jpeg','q9.jpeg','q10.jpeg',
+  'q11.jpeg','q12.jpeg','q13.jpeg','q14.jpeg','q15.jpeg'
+];
+
+const RESULT = {
+  ESTJ:'result_ant.png',    ISFJ:'result_bee.png',
+  ISTP:'result_beetle.png', ESFJ:'result_bumblebee.png',
+  ENFP:'result_butterfly.png', ENFJ:'result_cicada.png',
+  ENTP:'result_cricket.png',   ENTJ:'result_dragonfly.png',
+  ISFP:'result_firefly.png',   ESFP:'result_ladybug.png',
+  INTJ:'result_mantis.png',    INFP:'result_moth.png',
+  INTP:'result_spider.png',    ISTJ:'result_termite.png',
+  ESTP:'result_wasp.png',      INFJ:'result_weevil.png',
+};
+
+/* ── SCORING ── */
+const SC = [
+  [{E:1},{I:1},{T:1},{N:1}],
+  [{E:1},{S:1},{T:1},{F:1}],
+  [{E:1,P:1},{S:1},{T:1},{N:1,F:1}],
+  [{J:1},{P:1},{T:1},{F:1}],
+  [{N:1},{S:1},{T:1},{N:1,F:1}],
+  [{E:1},{I:1},{T:1},{F:1}],
+  [{E:1},{I:1},{T:1},{N:1,P:1}],
+  [{E:1},{I:1,S:1},{T:1},{N:1,P:1}],
+  [{E:1,P:1},{S:1},{T:1},{N:1,F:1}],
+  [{P:1},{S:1},{T:1},{N:1}],
+  [{E:1,P:1},{S:1},{T:1},{N:1}],
+  [{E:1,P:1},{S:1,I:1},{T:1},{N:1,F:1}],
+  [{E:1,N:1},{S:1,I:1},{T:1},{N:1,F:1}],
+  [{E:1,F:1},{I:1},{T:1},{F:1}],
+  [{E:1,P:1},{I:1,N:1},{T:1,J:1},{F:1}],
+];
+
+/* ── STATE ── */
+let curQ = 0;
+let sc   = {E:0,I:0,S:0,N:0,T:0,F:0,J:0,P:0};
+
+const imgEl = document.getElementById('img');
+const hl    = document.getElementById('hl');
+let   spots = [];
+
+/* ── LAYOUT: get rendered rect of object-fit:contain image ── */
+function rect() {
+  const cW = imgEl.clientWidth,  cH = imgEl.clientHeight;
+  const nW = imgEl.naturalWidth  || 2000;
+  const nH = imgEl.naturalHeight || 1413;
+  const s  = Math.min(cW/nW, cH/nH);
+  const rW = nW*s, rH = nH*s;
+  return {x:(cW-rW)/2, y:(cH-rH)/2, w:rW, h:rH};
+}
+
+function place(el, p) {
+  const r = rect();
+  el.style.left   = r.x + r.w*p.l/100 + 'px';
+  el.style.top    = r.y + r.h*p.t/100 + 'px';
+  el.style.width  = r.w*p.w/100 + 'px';
+  el.style.height = r.h*p.h/100 + 'px';
+}
+
+function reflow() { spots.forEach(({el,p})=>place(el,p)); }
+window.addEventListener('resize', reflow);
+
+function addSpot(p, fn) {
+  const el = document.createElement('button');
+  el.className = 'hs';
+  el.onclick = fn;
+  hl.appendChild(el);
+  place(el, p);
+  spots.push({el, p});
+}
+
+function clear() { hl.innerHTML=''; spots=[]; }
+
+function load(src, cb) {
+  clear();
+  imgEl.onload  = () => { reflow(); cb(); };
+  imgEl.onerror = () => console.warn('Cannot load:', src);
+  imgEl.src = src;
+}
+
+/* ── SCREENS ── */
+function home() {
+  curQ = 0;
+  sc   = {E:0,I:0,S:0,N:0,T:0,F:0,J:0,P:0};
+  load('start.jpeg', () => addSpot(BTN_START, quiz));
+}
+
+function quiz() {
+  load(Q_IMGS[0], () => {
+    BTN_ANS.forEach((p,i) => addSpot(p, ()=>pick(i)));
+  });
+  curQ = 0;
+}
+
+function pick(i) {
+  Object.entries(SC[curQ][i]).forEach(([k,v])=>sc[k]=(sc[k]||0)+v);
+  if (curQ < 14) {
+    curQ++;
+    load(Q_IMGS[curQ], () => {
+      BTN_ANS.forEach((p,j) => addSpot(p, ()=>pick(j)));
+    });
+  } else {
+    result();
+  }
+}
+
+function result() {
+  const s = sc;
+  const mbti =
+    (s.E>=s.I?'E':'I')+(s.S>=s.N?'S':'N')+
+    (s.T>=s.F?'T':'F')+(s.J>=s.P?'J':'P');
+  load(RESULT[mbti]||'result_butterfly.png', () => addSpot(BTN_AGAIN, home));
+}
+
+home();
+</script>
+</body>
+</html>
