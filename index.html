@@ -14,14 +14,14 @@
     #stage{
       position:relative;
       width:100vw;height:100vh;
-      display:flex;align-items:center;justify-content:center;
     }
+    /* Image remplit exactement l'ecran sans deborder */
     #img{
-      display:block;
-      max-width:100%;
-      max-height:100%;
-      width:auto;
-      height:auto;
+      position:absolute;
+      top:0;left:0;
+      width:100%;height:100%;
+      object-fit:contain;
+      object-position:top center;
       image-rendering:pixelated;
       user-select:none;
       -webkit-user-drag:none;
@@ -34,8 +34,7 @@
     .hs{
       position:absolute;
       background:transparent;
-      border:none;
-      cursor:pointer;
+      border:none;cursor:pointer;
       pointer-events:all;
       /* debug: background:rgba(255,0,0,.3); */
     }
@@ -49,7 +48,8 @@
   <div id="hl"></div>
 </div>
 <script>
-/* ── HOTSPOT COORDS (% of rendered image size) ── */
+/* ── HOTSPOT COORDS (% of rendered image — computed via getBoundingClientRect) ── */
+
 const BTN_START = {t:42.3, l:15.2, w:34.0, h:5.3};
 
 const BTN_ANS = [
@@ -67,15 +67,16 @@ const Q_IMGS = [
   'q11.jpeg','q12.jpeg','q13.jpeg','q14.jpeg','q15.jpeg'
 ];
 
+// Resultats — noms exacts de tes fichiers sur GitHub
 const RESULT = {
-  ESTJ:'result_ant.png',      ISFJ:'result_bee.png',
-  ISTP:'result_beetle.png',   ESFJ:'result_bumblebee.png',
-  ENFP:'result_butterfly.png',ENFJ:'result_cicada.png',
-  ENTP:'result_cricket.png',  ENTJ:'result_dragonfly.png',
-  ISFP:'result_firefly.png',  ESFP:'result_ladybug.png',
-  INTJ:'result_mantis.png',   INFP:'result_moth.png',
-  INTP:'result_spider.png',   ISTJ:'result_termite.png',
-  ESTP:'result_wasp.png',     INFJ:'result_weevil.png',
+  ESTJ:'ant.png',      ISFJ:'bee.png',
+  ISTP:'beetle.png',   ESFJ:'bumblebee.png',
+  ENFP:'butterfly.png',ENFJ:'cicada.png',
+  ENTP:'cricket.png',  ENTJ:'dragonfly.png',
+  ISFP:'firefly.png',  ESFP:'ladybug.png',
+  INTJ:'mantis.png',   INFP:'moth.png',
+  INTP:'spider.png',   ISTJ:'termite.png',
+  ESTP:'wasp.png',     INFJ:'weevil.png',
 };
 
 const SC = [
@@ -103,20 +104,23 @@ const imgEl = document.getElementById('img');
 const hl    = document.getElementById('hl');
 let spots   = [];
 
-/* Get the rendered rect of the image inside the flexbox stage */
-function getRect() {
-  const r = imgEl.getBoundingClientRect();
-  const s = document.getElementById('stage').getBoundingClientRect();
-  return {
-    x: r.left - s.left,
-    y: r.top  - s.top,
-    w: r.width,
-    h: r.height
-  };
+/* Calcule la zone reelle de l'image (object-fit:contain + object-position:top center) */
+function getRenderedRect() {
+  const cW = imgEl.clientWidth;
+  const cH = imgEl.clientHeight;
+  const nW = imgEl.naturalWidth  || 2000;
+  const nH = imgEl.naturalHeight || 1413;
+  const scale = Math.min(cW/nW, cH/nH);
+  const rW = nW * scale;
+  const rH = nH * scale;
+  // object-position: top center
+  const x = (cW - rW) / 2;
+  const y = 0; // top
+  return {x, y, w:rW, h:rH};
 }
 
 function place(el, p) {
-  const r = getRect();
+  const r = getRenderedRect();
   el.style.left   = (r.x + r.w * p.l/100) + 'px';
   el.style.top    = (r.y + r.h * p.t/100) + 'px';
   el.style.width  = (r.w * p.w/100) + 'px';
@@ -140,13 +144,13 @@ function clear() { hl.innerHTML=''; spots=[]; }
 function load(src, cb) {
   clear();
   imgEl.onload  = () => { reflow(); cb(); };
-  imgEl.onerror = () => console.warn('Missing:', src);
+  imgEl.onerror = () => console.warn('Missing file:', src);
   imgEl.src = src;
 }
 
 function home() {
   curQ = 0;
-  sc   = {E:0,I:0,S:0,N:0,T:0,F:0,J:0,P:0};
+  sc = {E:0,I:0,S:0,N:0,T:0,F:0,J:0,P:0};
   load('start.jpeg', () => addSpot(BTN_START, quiz));
 }
 
@@ -158,7 +162,7 @@ function quiz() {
 }
 
 function pick(i) {
-  Object.entries(SC[curQ][i]).forEach(([k,v])=>sc[k]=(sc[k]||0)+v);
+  Object.entries(SC[curQ][i]).forEach(([k,v]) => sc[k]=(sc[k]||0)+v);
   if (curQ < 14) {
     curQ++;
     load(Q_IMGS[curQ], () => {
@@ -174,7 +178,8 @@ function showResult() {
   const mbti =
     (s.E>=s.I?'E':'I')+(s.S>=s.N?'S':'N')+
     (s.T>=s.F?'T':'F')+(s.J>=s.P?'J':'P');
-  load(RESULT[mbti]||'result_butterfly.png', () => addSpot(BTN_AGAIN, home));
+  const file = RESULT[mbti] || 'butterfly.png';
+  load(file, () => addSpot(BTN_AGAIN, home));
 }
 
 home();
