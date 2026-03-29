@@ -14,12 +14,14 @@
     #stage{
       position:relative;
       width:100vw;height:100vh;
+      display:flex;align-items:center;justify-content:center;
     }
     #img{
       display:block;
-      width:100%;height:100%;
-      object-fit:cover;
-      object-position:center;
+      max-width:100%;
+      max-height:100%;
+      width:auto;
+      height:auto;
       image-rendering:pixelated;
       user-select:none;
       -webkit-user-drag:none;
@@ -35,7 +37,7 @@
       border:none;
       cursor:pointer;
       pointer-events:all;
-      /* debug: background:rgba(255,0,0,.25); */
+      /* debug: background:rgba(255,0,0,.3); */
     }
     .hs:hover{background:rgba(255,255,255,.08)}
     .hs:active{background:rgba(255,255,255,.18)}
@@ -47,12 +49,9 @@
   <div id="hl"></div>
 </div>
 <script>
-/* ── HOTSPOT COORDS (% of screen, object-fit:cover) ── */
-
-// start.jpeg — "Start test" button
+/* ── HOTSPOT COORDS (% of rendered image size) ── */
 const BTN_START = {t:42.3, l:15.2, w:34.0, h:5.3};
 
-// q*.jpeg — answers A B C D
 const BTN_ANS = [
   {t:47.4, l:15.2, w:69.5, h:7.8},
   {t:55.3, l:15.2, w:69.5, h:7.5},
@@ -60,7 +59,6 @@ const BTN_ANS = [
   {t:70.9, l:15.2, w:69.5, h:7.5},
 ];
 
-// result — "Start again"
 const BTN_AGAIN = {t:77.4, l:20.5, w:45.5, h:4.7};
 
 const Q_IMGS = [
@@ -105,13 +103,28 @@ const imgEl = document.getElementById('img');
 const hl    = document.getElementById('hl');
 let spots   = [];
 
-/* object-fit:cover — hotspots are simply % of viewport */
-function place(el, p) {
-  el.style.left   = p.l + '%';
-  el.style.top    = p.t + '%';
-  el.style.width  = p.w + '%';
-  el.style.height = p.h + '%';
+/* Get the rendered rect of the image inside the flexbox stage */
+function getRect() {
+  const r = imgEl.getBoundingClientRect();
+  const s = document.getElementById('stage').getBoundingClientRect();
+  return {
+    x: r.left - s.left,
+    y: r.top  - s.top,
+    w: r.width,
+    h: r.height
+  };
 }
+
+function place(el, p) {
+  const r = getRect();
+  el.style.left   = (r.x + r.w * p.l/100) + 'px';
+  el.style.top    = (r.y + r.h * p.t/100) + 'px';
+  el.style.width  = (r.w * p.w/100) + 'px';
+  el.style.height = (r.h * p.h/100) + 'px';
+}
+
+function reflow() { spots.forEach(({el,p}) => place(el,p)); }
+window.addEventListener('resize', reflow);
 
 function addSpot(p, fn) {
   const el = document.createElement('button');
@@ -126,7 +139,7 @@ function clear() { hl.innerHTML=''; spots=[]; }
 
 function load(src, cb) {
   clear();
-  imgEl.onload  = cb;
+  imgEl.onload  = () => { reflow(); cb(); };
   imgEl.onerror = () => console.warn('Missing:', src);
   imgEl.src = src;
 }
